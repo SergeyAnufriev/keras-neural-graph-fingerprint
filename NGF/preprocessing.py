@@ -1,6 +1,6 @@
 ''' Code to generate graph tensor features for molecules (in SMILES form)
 '''
-from __future__ import division, print_function
+
 from functools import partial
 from multiprocessing import cpu_count, Pool
 

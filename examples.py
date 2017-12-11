@@ -1,6 +1,6 @@
 ''' Examples that demonstrate some of the functionality in the NGF module
 '''
-from __future__ import division, print_function, absolute_import
+
 
 from keras.layers import Input, merge, Dense
 from keras import models

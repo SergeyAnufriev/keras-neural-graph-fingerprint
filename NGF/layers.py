@@ -1,7 +1,7 @@
 ''' Defines layers to build convolutional graph networks.
 '''
 
-from __future__ import print_function
+
 
 from numpy import inf, ndarray
 from copy import deepcopy
@@ -164,7 +164,7 @@ class NeuralGraphHidden(layers.Layer):
         # Initialise based on one of the three initialisation methods
 
         # Case 1: Check if inner_layer_arg is conv_width
-        if isinstance(inner_layer_arg, (int, long)):
+        if isinstance(inner_layer_arg, int):
             self.conv_width = inner_layer_arg
             dense_layer_kwargs, kwargs = filter_func_args(layers.Dense.__init__,
             kwargs, overrule_args=['name'])
@@ -368,7 +368,7 @@ class NeuralGraphOutput(layers.Layer):
         # Initialise based on one of the three initialisation methods
 
         # Case 1: Check if inner_layer_arg is fp_length
-        if isinstance(inner_layer_arg, (int, long)):
+        if isinstance(inner_layer_arg, int):
             self.fp_length = inner_layer_arg
             dense_layer_kwargs, kwargs = filter_func_args(layers.Dense.__init__,
             kwargs, overrule_args=['name'])

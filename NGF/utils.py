@@ -1,6 +1,6 @@
 ''' Utilities used within the NGF module
 '''
-from __future__ import print_function
+
 
 import inspect
 from itertools import cycle
@@ -23,7 +23,7 @@ def filter_func_args(fn, args, invalid_args=[], overrule_args=[]):
     fn_valid_args = inspect.getargspec(fn)[0]
     fn_args = {}
     other_args = {}
-    for arg, val in args.iteritems():
+    for arg, val in args.items():
         if not arg in invalid_args:
             if (arg in fn_valid_args) and (arg not in overrule_args):
                 fn_args[arg] = val
@@ -59,7 +59,7 @@ def zip_mixed(*mixed_iterables, **kwargs):
         if isinstance(item, repeat_classes):
             mixed_iterables[i] = cycle([item])
 
-    return zip(*mixed_iterables)
+    return list(zip(*mixed_iterables))
 
 def mol_dims_to_shapes(max_atoms, max_degree, num_atom_features, num_bond_features, num_molecules=None):
     ''' Helper function, returns shape for molecule tensors given dim sizes

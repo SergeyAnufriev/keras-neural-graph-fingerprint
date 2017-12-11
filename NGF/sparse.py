@@ -1,7 +1,7 @@
 ''' Classes for sparse vectors, lists of related tensors and tensors describing
 molecular graphs
 '''
-from __future__ import division, print_function, absolute_import
+
 
 import numpy as np
 import pickle as pkl
@@ -55,16 +55,16 @@ class SparseTensor(object):
 
         # Assert valid index and convert negative indices to positive
         ndims = len(nonsparse_indices)
-        main_axis = range(ndims)[main_axis]
+        main_axis = list(range(ndims))[main_axis]
 
         self.main_axis = main_axis
         self.default_value = default_value
 
         # Sort if necessary
         if not assume_sorted and len(nonsparse_values):
-            nonsparse_entries = zip(nonsparse_values, *nonsparse_indices)
+            nonsparse_entries = list(zip(nonsparse_values, *nonsparse_indices))
             sorted(nonsparse_entries, key=lambda x: x[main_axis+1])
-            sorted_entries = zip(*nonsparse_entries)
+            sorted_entries = list(zip(*nonsparse_entries))
             nonsparse_values = list(sorted_entries[0])
             nonsparse_indices = list(sorted_entries[1:])
 
@@ -94,7 +94,7 @@ class SparseTensor(object):
         # Build lookup for quick indexing along the main_axis
         #   lookup defines first position of that element
         self.lookup = np.searchsorted(nonsparse_indices[self.main_axis],
-                                      range(self.shape[self.main_axis]+1))
+                                      list(range(self.shape[self.main_axis]+1)))
 
     @property
     def max_shape(self):
@@ -146,7 +146,7 @@ class SparseTensor(object):
 
             start_stop = self.lookup[keys:keys+2]
             if len(start_stop):
-                inds = range(*start_stop)
+                inds = list(range(*start_stop))
             else:
                 inds = []
 
@@ -197,7 +197,7 @@ class SparseTensor(object):
         # Ensure keys is of usable type
         if isinstance(keys, slice):
             start, stop, step = keys.indices(len(self))
-            keys = range(start, stop, step)
+            keys = list(range(start, stop, step))
         if isinstance(keys, (tuple, list, np.ndarray)):
             if len(keys) == 0:
                 raise IndexError('Cannot index `SparseTensor` with empty slice (`[]`)')
@@ -513,7 +513,7 @@ class EpochIterator(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         # At the end of an epoch, raise Stopiteration, or reset counter
         if self.i >= len(self.data):
             if self.epoch >= self.epochs:
@@ -538,7 +538,7 @@ class EpochIterator(object):
         '''
         self.i = 0
         self.epoch = 1
-        self.indices = range(len(self.data))
+        self.indices = list(range(len(self.data)))
 
 
 def unit_tests_sparse_tensor(seed=None):
