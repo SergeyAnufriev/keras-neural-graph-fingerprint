@@ -83,7 +83,7 @@ edges = Input(name='edge_inputs', shape=(max_atoms, max_degree), dtype='int32')
 
 # Define the convoluted atom feature layers
 # All methods of initialisation are equaivalent!
-atoms1 = NeuralGraphHidden(lambda: Dense(conv_width, activation='relu', bias=False))([atoms0, bonds, edges])
+atoms1 = NeuralGraphHidden(Dense(conv_width, activation='relu', bias=False))([atoms0, bonds, edges])
 atoms2 = NeuralGraphHidden(Dense(conv_width, activation='relu', bias=False))([atoms1, bonds, edges])
 
 # Define the outputs of each (convoluted) atom featuer layer to fingerprint
