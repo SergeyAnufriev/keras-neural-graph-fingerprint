@@ -2,7 +2,6 @@
 '''
 
 
-import inspect
 from itertools import cycle
 
 def filter_func_args(fn, args, invalid_args=[], overrule_args=[]):
@@ -20,7 +19,16 @@ def filter_func_args(fn, args, invalid_args=[], overrule_args=[]):
             takes, and the others (minus `invalid_args`)
     '''
 
-    fn_valid_args = inspect.getargspec(fn)[0]
+    fn_valid_args = {
+        'activation', 
+        'use_bias', 
+        'kernel_initializer', 
+        'bias_initializer', 
+        'kernel_regularizer', 
+        'bias_regularizer', 
+        'activity_regularizer', 
+        'kernel_constraint', 
+        'bias_constraint'}
     fn_args = {}
     other_args = {}
     for arg, val in args.items():
@@ -61,7 +69,8 @@ def zip_mixed(*mixed_iterables, **kwargs):
 
     return list(zip(*mixed_iterables))
 
-def mol_dims_to_shapes(max_atoms, max_degree, num_atom_features, num_bond_features, num_molecules=None):
+def mol_dims_to_shapes(max_atoms, max_degree, num_atom_features,
+                       num_bond_features, num_molecules=None):
     ''' Helper function, returns shape for molecule tensors given dim sizes
     '''
     atoms_shape = (num_molecules, max_atoms, num_atom_features)

@@ -2,7 +2,7 @@
 '''
 
 
-from keras.regularizers import l1l2
+from keras.regularizers import l1_l2
 from keras.layers import Input, merge, Dense, Dropout, BatchNormalization
 from keras import models
 
