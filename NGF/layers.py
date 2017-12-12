@@ -11,7 +11,6 @@ from NGF.backend import neighbour_lookup
 from .utils import filter_func_args, mol_shapes_to_dims
 
 
-
 class NeuralGraphHidden(layers.Layer):
     ''' Hidden Convolutional layer in a Neural Graph (as in Duvenaud et. al.,
     2015). This layer takes a graph as an input. The graph is represented as by
@@ -87,7 +86,8 @@ class NeuralGraphHidden(layers.Layer):
         # Case 2: Check if an initialised keras layer is given
         elif isinstance(inner_layer_arg, layers.Layer):
             assert inner_layer_arg.built == False, 'When initialising with a keras layer, it cannot be built.'
-            _, self.conv_width = inner_layer_arg.compute_output_shape((None, None))
+            _, self.conv_width = inner_layer_arg.compute_output_shape((None,
+                                                                       None))
             # layer_from_config will mutate the config dict, therefore create a get fn
             self.create_inner_layer_fn = lambda: layers.deserialize(dict(
                                                     class_name=inner_layer_arg.__class__.__name__,
@@ -96,13 +96,18 @@ class NeuralGraphHidden(layers.Layer):
         # Case 3: Check if a function is provided that returns a initialised keras layer
         elif callable(inner_layer_arg):
             example_instance = inner_layer_arg()
-            assert isinstance(example_instance, layers.Layer), 'When initialising with a function, the function has to return a keras layer'
+            assert isinstance(
+                example_instance, layers.Layer
+            ), 'When initialising with a function, the function has to return a keras layer'
             assert example_instance.built == False, 'When initialising with a keras layer, it cannot be built.'
-            _, self.conv_width = example_instance.compute_output_shape((None, None))
+            _, self.conv_width = example_instance.compute_output_shape((None,
+                                                                        None))
             self.create_inner_layer_fn = inner_layer_arg
 
         else:
-            raise ValueError('NeuralGraphHidden has to be initialised with 1). int conv_widht, 2). a keras layer instance, or 3). a function returning a keras layer instance.')
+            raise ValueError(
+                'NeuralGraphHidden has to be initialised with 1). int conv_widht, 2). a keras layer instance, or 3). a function returning a keras layer instance.'
+            )
 
         super(NeuralGraphHidden, self).__init__(**kwargs)
 
@@ -123,15 +128,19 @@ class NeuralGraphHidden(layers.Layer):
             # Initialise inner layer, and rename it
             inner_layer = self.create_inner_layer_fn()
             inner_layer_type = inner_layer.__class__.__name__.lower()
-            inner_layer.name = self.name + '_inner_' + inner_layer_type + '_' + str(degree)
+            inner_layer.name = self.name + '_inner_' + inner_layer_type + '_' + str(
+                degree)
 
             # Initialise TimeDistributed layer wrapper in order to parallelise
             #   dense layer across atoms (3D)
-            inner_3D_layer_name = self.name + '_inner_timedistributed_' + str(degree)
-            inner_3D_layer = layers.TimeDistributed(inner_layer, name=inner_3D_layer_name)
+            inner_3D_layer_name = self.name + '_inner_timedistributed_' + str(
+                degree)
+            inner_3D_layer = layers.TimeDistributed(
+                inner_layer, name=inner_3D_layer_name)
 
             # Build the TimeDistributed layer (which will build the Dense layer)
-            inner_3D_layer.build((None, max_atoms, num_atom_features+num_bond_features))
+            inner_3D_layer.build((None, max_atoms,
+                                  num_atom_features + num_bond_features))
 
             # Store inner_3D_layer and it's weights
             self.inner_3D_layers.append(inner_3D_layer)
@@ -150,7 +159,8 @@ class NeuralGraphHidden(layers.Layer):
         atom_degrees = K.sum(K.not_equal(edges, -1), axis=-1, keepdims=True)
 
         # For each atom, look up the features of it's neighbour
-        neighbour_atom_features = neighbour_lookup(atoms, edges, include_self=True)
+        neighbour_atom_features = neighbour_lookup(
+            atoms, edges, include_self=True)
 
         # Sum along degree axis to get summed neighbour features
         summed_atom_features = K.sum(neighbour_atom_features, axis=-2)
@@ -159,20 +169,24 @@ class NeuralGraphHidden(layers.Layer):
         summed_bond_features = K.sum(bonds, axis=-2)
 
         # Concatenate the summed atom and bond features
-        summed_features = K.concatenate([summed_atom_features, summed_bond_features], axis=-1)
+        summed_features = K.concatenate(
+            [summed_atom_features, summed_bond_features], axis=-1)
 
         # For each degree we convolve with a different weight matrix
         new_features_by_degree = []
         for degree in range(self.max_degree):
 
             # Create mask for this degree
-            atom_masks_this_degree = K.cast(K.equal(atom_degrees, degree), K.floatx())
+            atom_masks_this_degree = K.cast(
+                K.equal(atom_degrees, degree), K.floatx())
 
             # Multiply with hidden merge layer
             #   (use time Distributed because we are dealing with 2D input/3D for batches)
             # Add keras shape to let keras now the dimensions
-            summed_features._keras_shape = (None, max_atoms, num_atom_features+num_bond_features)
-            new_unmasked_features = self.inner_3D_layers[degree](summed_features)
+            summed_features._keras_shape = (
+                None, max_atoms, num_atom_features + num_bond_features)
+            new_unmasked_features = self.inner_3D_layers[degree](
+                summed_features)
 
             # Do explicit masking because TimeDistributed does not support masking
             new_masked_features = new_unmasked_features * atom_masks_this_degree
@@ -196,8 +210,9 @@ class NeuralGraphHidden(layers.Layer):
     def from_config(cls, config):
         # Use layer build function to initialise new NeuralHiddenLayer
         inner_layer_config = config.pop('inner_layer_config')
+
         # create_inner_layer_fn = lambda: layer_from_config(inner_layer_config.copy())
-        
+
         def create_inner_layer_fn():
             return layers.deserialize(deepcopy(inner_layer_config))
 
@@ -209,8 +224,9 @@ class NeuralGraphHidden(layers.Layer):
 
         # Store config of (a) inner layer of the 3D wrapper
         inner_layer = self.inner_3D_layers[0].layer
-        config['inner_layer_config'] = dict(config=inner_layer.get_config(),
-                                            class_name=inner_layer.__class__.__name__)
+        config['inner_layer_config'] = dict(
+            config=inner_layer.get_config(),
+            class_name=inner_layer.__class__.__name__)
         return config
 
 
@@ -285,26 +301,34 @@ class NeuralGraphOutput(layers.Layer):
         # Case 1: Check if inner_layer_arg is fp_length
         if isinstance(inner_layer_arg, int):
             self.fp_length = inner_layer_arg
-            dense_layer_kwargs, kwargs = filter_func_args(layers.Dense.__init__,
-                                                          kwargs, overrule_args=['name'])
+            dense_layer_kwargs, kwargs = filter_func_args(
+                layers.Dense.__init__, kwargs, overrule_args=['name'])
             self.create_inner_layer_fn = lambda: layers.Dense(self.fp_length, **dense_layer_kwargs)
 
         # Case 2: Check if an initialised keras layer is given
         elif isinstance(inner_layer_arg, layers.Layer):
             assert inner_layer_arg.built == False, 'When initialising with a keras layer, it cannot be built.'
-            _, self.fp_length = inner_layer_arg.compute_output_shape((None, None))
+            _, self.fp_length = inner_layer_arg.compute_output_shape(
+                (None, None))
             self.create_inner_layer_fn = lambda: inner_layer_arg
 
         # Case 3: Check if a function is provided that returns a initialised keras layer
         elif callable(inner_layer_arg):
             example_instance = inner_layer_arg()
-            assert isinstance(example_instance, layers.Layer), 'When initialising with a function, the function has to return a keras layer'
+            assert isinstance(
+                example_instance, layers.Layer
+            ), 'When initialising with a function, the function has to return a keras layer'
             assert example_instance.built == False, 'When initialising with a keras layer, it cannot be built.'
-            _, self.fp_length = example_instance.compute_output_shape((None, None))
+            _, self.fp_length = example_instance.compute_output_shape(
+                (None, None))
             self.create_inner_layer_fn = inner_layer_arg
 
         else:
-            raise ValueError('NeuralGraphHidden has to be initialised with 1). int conv_widht, 2). a keras layer instance, or 3). a function returning a keras layer instance.')
+            raise ValueError(
+                'NeuralGraphHidden has to be initialised with 1). int '
+                'conv_width, 2). a keras layer instance, or 3). a function '
+                'returning a keras layer instance.'
+            )
 
         super(NeuralGraphOutput, self).__init__(**kwargs)
 
@@ -318,19 +342,20 @@ class NeuralGraphOutput(layers.Layer):
         # Initialise dense layer with specified params (kwargs) and name
         inner_layer = self.create_inner_layer_fn()
         inner_layer_type = inner_layer.__class__.__name__.lower()
-        inner_layer.name = self.name + '_inner_'+ inner_layer_type
+        inner_layer.name = self.name + '_inner_' + inner_layer_type
 
         # Initialise TimeDistributed layer wrapper in order to parallelise
         #   dense layer across atoms
         inner_3D_layer_name = self.name + '_inner_timedistributed'
-        self.inner_3D_layer = layers.TimeDistributed(inner_layer, name=inner_3D_layer_name)
+        self.inner_3D_layer = layers.TimeDistributed(
+            inner_layer, name=inner_3D_layer_name)
 
         # Build the TimeDistributed layer (which will build the Dense layer)
-        self.inner_3D_layer.build((None, max_atoms, num_atom_features+num_bond_features))
+        self.inner_3D_layer.build((None, max_atoms,
+                                   num_atom_features + num_bond_features))
 
         # Store dense_3D_layer and it's weights
         self.trainable_weights = self.inner_3D_layer.trainable_weights
-
 
     def call(self, inputs, mask=None):
         atoms, bonds, edges = inputs
@@ -352,10 +377,12 @@ class NeuralGraphOutput(layers.Layer):
         summed_bond_features = K.sum(bonds, axis=-2)
 
         # Concatenate the summed atom and bond features
-        atoms_bonds_features = K.concatenate([atoms, summed_bond_features], axis=-1)
+        atoms_bonds_features = K.concatenate(
+            [atoms, summed_bond_features], axis=-1)
 
         # Compute fingerprint
-        atoms_bonds_features._keras_shape = (None, max_atoms, num_atom_features+num_bond_features)
+        atoms_bonds_features._keras_shape = (
+            None, max_atoms, num_atom_features + num_bond_features)
         fingerprint_out_unmasked = self.inner_3D_layer(atoms_bonds_features)
 
         # Do explicit masking because TimeDistributed does not support masking
@@ -388,9 +415,11 @@ class NeuralGraphOutput(layers.Layer):
 
         # Store config of inner layer of the 3D wrapper
         inner_layer = self.inner_3D_layer.layer
-        config['inner_layer_config'] = dict(config=inner_layer.get_config(),
-                                            class_name=inner_layer.__class__.__name__)
+        config['inner_layer_config'] = dict(
+            config=inner_layer.get_config(),
+            class_name=inner_layer.__class__.__name__)
         return config
+
 
 class NeuralGraphPool(layers.Layer):
     ''' Pooling layer in a Neural graph, for each atom, takes the max for each
@@ -406,6 +435,7 @@ class NeuralGraphPool(layers.Layer):
         New atom features (of same shape:)
         `(samples, max_atoms, atom_features)`
     '''
+
     def __init__(self, **kwargs):
         super(NeuralGraphPool, self).__init__(**kwargs)
 
@@ -413,8 +443,8 @@ class NeuralGraphPool(layers.Layer):
         atoms, bonds, edges = inputs
 
         # For each atom, look up the featues of it's neighbour
-        neighbour_atom_features = neighbour_lookup(atoms, edges, maskvalue=-inf,
-                                                   include_self=True)
+        neighbour_atom_features = neighbour_lookup(
+            atoms, edges, maskvalue=-inf, include_self=True)
 
         # Take max along `degree` axis (2) to get max of neighbours and self
         max_features = K.max(neighbour_atom_features, axis=2)
@@ -441,6 +471,7 @@ class AtomwiseDropout(layers.Layer):
         p: float between 0 and 1. Fraction of the input units to drop.
 
     '''
+
     def __init__(self, p, **kwargs):
         self.dropout_layer = layers.Dropout(p)
         self.uses_learning_phase = self.dropout_layer.uses_learning_phase
@@ -455,14 +486,19 @@ class AtomwiseDropout(layers.Layer):
         max_atoms = K.shape(inputs)[1]
 
         # By [farizrahman4u](https://github.com/fchollet/keras/issues/3995)
-        ones = layers.Lambda(lambda x: (x * 0 + 1)[:, 0, :], output_shape=lambda s: (s[0], s[2]))(inputs)
+        ones = layers.Lambda(
+            lambda x: (x * 0 + 1)[:, 0, :],
+            output_shape=lambda s: (s[0], s[2]))(inputs)
         dropped = self.dropout_layer(ones)
         dropped = layers.RepeatVector(max_atoms)(dropped)
-        return layers.Lambda(lambda x: x[0] * x[1], output_shape=lambda s: s[0])([inputs, dropped])
+        return layers.Lambda(
+            lambda x: x[0] * x[1],
+            output_shape=lambda s: s[0])([inputs, dropped])
 
     def get_config(self):
         config = super(AtomwiseDropout, self).get_config()
         config['p'] = self.dropout_layer.p
         return config
+
 
 #TODO: Add GraphWiseDropout layer, that creates masks for each degree separately.

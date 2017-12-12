@@ -2,6 +2,7 @@ from numpy import ndarray
 import theano.tensor as T
 import keras.backend as K
 
+
 def temporal_padding(x, paddings=(1, 0), padvalue=0):
     '''Pad the middle dimension of a 3D tensor
     with `padding[0]` values left and `padding[1]` values right.
@@ -15,16 +16,17 @@ def temporal_padding(x, paddings=(1, 0), padvalue=0):
         paddings = (paddings, paddings)
 
     input_shape = x.shape
-    output_shape = (input_shape[0],
-                    input_shape[1] + sum(paddings),
+    output_shape = (input_shape[0], input_shape[1] + sum(paddings),
                     input_shape[2])
     output = T.zeros(output_shape)
 
     # Set pad value and set subtensor of actual tensor
     output = T.set_subtensor(output[:, :paddings[0], :], padvalue)
     output = T.set_subtensor(output[:, paddings[1]:, :], padvalue)
-    output = T.set_subtensor(output[:, paddings[0]:x.shape[1] + paddings[0], :], x)
+    output = T.set_subtensor(
+        output[:, paddings[0]:x.shape[1] + paddings[0], :], x)
     return output
+
 
 def neighbour_lookup(atoms, edges, maskvalue=0, include_self=False):
     ''' Looks up the features of an all atoms neighbours, for a batch of molecules.
@@ -53,8 +55,7 @@ def neighbour_lookup(atoms, edges, maskvalue=0, include_self=False):
     masked_edges = edges + 1
     # We then add a padding vector at index 0 by padding to the left of the
     #   lookup matrix with the value that the new mask should get
-    masked_atoms = temporal_padding(atoms, (1,0), padvalue=maskvalue)
-
+    masked_atoms = temporal_padding(atoms, (1, 0), padvalue=maskvalue)
 
     # Import dimensions
     atoms_shape = K.shape(masked_atoms)
@@ -68,7 +69,8 @@ def neighbour_lookup(atoms, edges, maskvalue=0, include_self=False):
 
     # create broadcastable offset
     offset_shape = (batch_n, 1, 1)
-    offset = K.reshape(T.arange(batch_n, dtype=K.dtype(masked_edges)), offset_shape)
+    offset = K.reshape(
+        T.arange(batch_n, dtype=K.dtype(masked_edges)), offset_shape)
     offset *= lookup_size
 
     # apply offset to account for the fact that after reshape, all individual
