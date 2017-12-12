@@ -10,6 +10,9 @@ from NGF.layers import NeuralGraphHidden, NeuralGraphOutput
 from NGF.models import build_graph_conv_model
 from NGF.sparse import GraphTensor, EpochIterator
 
+# import theano
+# theano.config.compute_test_value = 'warn'
+
 # ==============================================================================
 # ================================ Load the data ===============================
 # ==============================================================================
@@ -64,7 +67,7 @@ final_fp = Add()([fp_out0, fp_out1, fp_out2])
 # Build and compile model for regression.
 main_prediction = Dense(
     1, activation='linear', name='main_prediction')(final_fp)
-model = models.Model(input=[atoms0, bonds, edges], output=[main_prediction])
+model = models.Model(inputs=[atoms0, bonds, edges], outputs=[main_prediction])
 model.compile(optimizer='adagrad', loss='mse')
 
 # Show summary
@@ -117,7 +120,7 @@ final_fp = Add()([fp_out0, fp_out1, fp_out2])
 # Build and compile model for regression.
 main_prediction = Dense(
     1, activation='linear', name='main_prediction')(final_fp)
-model2 = models.Model(input=[atoms0, bonds, edges], output=[main_prediction])
+model2 = models.Model(inputs=[atoms0, bonds, edges], outputs=[main_prediction])
 model2.compile(optimizer='adagrad', loss='mse')
 
 # Show summary
@@ -174,4 +177,4 @@ X_mols = GraphTensor([X_atoms, X_bonds, X_edges])
 
 # Build a generator and train the model
 my_generator = EpochIterator((X_mols, labels), batch_size=128)
-model4.fit_generator(my_generator, nb_epoch=20, samples_per_epoch=len(labels))
+model4.fit_generator(my_generator, epochs=20, steps_per_epoch=9)

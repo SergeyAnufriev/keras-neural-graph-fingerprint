@@ -2,21 +2,16 @@
 '''
 
 from keras.regularizers import l1_l2
-from keras.layers import Input, merge, Dense, Dropout, BatchNormalization
+from keras.layers import Input, Add, Dense, Dropout, BatchNormalization
 from keras import models
 
 from .layers import NeuralGraphHidden, NeuralGraphOutput, NeuralGraphPool, AtomwiseDropout
 from .utils import zip_mixed, is_iterable
 
 
-def build_graph_conv_model(max_atoms,
-                           max_degree,
-                           num_atom_features,
-                           num_bond_features,
-                           learning_type,
-                           output_size=1,
-                           optimizer='adagrad',
-                           **kwargs):
+def build_graph_conv_model(max_atoms, max_degree, num_atom_features,
+                           num_bond_features, learning_type, output_size=1,
+                           optimizer='adagrad', **kwargs):
     ''' Builds and compiles a graph convolutional network with a regular neural
 		network on top for regression.
 
@@ -66,39 +61,21 @@ def build_graph_conv_model(max_atoms,
         name='main_prediction')(net_output)
 
     # Build and compile the model
-    model = models.Model(input=[atoms, bonds, edges], output=[main_prediction])
+    model = models.Model(inputs=[atoms, bonds, edges], outputs=[main_prediction])
     model.compile(optimizer=optimizer, loss=loss)
 
     return model
 
 
-def build_graph_conv_net(data_input,
-                         conv_layer_sizes=[],
-                         fp_layer_size=1024,
-                         net_layer_sizes=[],
-                         conv_activation='relu',
-                         fp_activation='softmax',
-                         net_activation='relu',
-                         conv_bias=True,
-                         fp_bias=True,
-                         net_bias=True,
-                         conv_l1=0,
-                         fp_l1=0,
-                         net_l1=0,
-                         conv_l2=0,
-                         fp_l2=0,
-                         net_l2=0,
-                         conv_dropout=0,
-                         fp_dropout=0,
-                         net_dropout=0,
-                         conv_batchnorm=0,
-                         fp_batchnorm=0,
-                         net_batchnorm=0,
-                         conv_kwargs={},
-                         fp_kwargs={},
-                         net_kwargs={},
-                         fp_merge_mode='sum',
-                         atomwise_dropout=True,
+def build_graph_conv_net(data_input, conv_layer_sizes=[], fp_layer_size=1024,
+                         net_layer_sizes=[], conv_activation='relu',
+                         fp_activation='softmax', net_activation='relu',
+                         conv_bias=True, fp_bias=True, net_bias=True,
+                         conv_l1=0, fp_l1=0, net_l1=0, conv_l2=0, fp_l2=0,
+                         net_l2=0, conv_dropout=0, fp_dropout=0, net_dropout=0,
+                         conv_batchnorm=0, fp_batchnorm=0, net_batchnorm=0,
+                         conv_kwargs={}, fp_kwargs={}, net_kwargs={},
+                         fp_merge_mode='sum', atomwise_dropout=True,
                          graphpool=False):
     ''' Builds a graph convolutional network with a regular neural network on
 		top.
@@ -143,6 +120,7 @@ def build_graph_conv_net(data_input,
 		fp_merge_mode (str): If multiple fingerprint ouput layers are specified,
 			this arguments specifies how they are combined. (see `keras.layers.merge`)
 			Note that if `fp_merge_mode='sum', all `fp_layer_size` should be equal.
+            deprecated:: keras 2.0 doesn't use this syntax
 		atomwise_dropout (bool): If true, the same atoms will be dropped out in
 			each batch, this should be done because the weights are also shared
 			between atoms in each batch. But could be turned of to investigate its
@@ -164,63 +142,42 @@ def build_graph_conv_net(data_input,
         fp_layer_sizes = [fp_layer_sizes]
 
     # Merge all parameter into tuples for each layer
-    conv_layers = zip_mixed(
-        conv_layer_sizes,
-        conv_activation,
-        conv_bias,
-        conv_l1,
-        conv_l2,
-        conv_dropout,
-        conv_batchnorm,
-        conv_kwargs,
-        graphpool,
-        repeat_classes=[dict, str])
-    fp_layers = zip_mixed(
-        fp_layer_sizes,
-        fp_activation,
-        fp_bias,
-        fp_l1,
-        fp_l2,
-        fp_dropout,
-        fp_batchnorm,
-        fp_kwargs,
-        repeat_classes=[dict, str])
-    net_layers = zip_mixed(
-        net_layer_sizes,
-        net_activation,
-        net_bias,
-        net_l1,
-        net_l2,
-        net_dropout,
-        net_batchnorm,
-        net_kwargs,
-        repeat_classes=[dict, str])
+    conv_layers = zip_mixed(conv_layer_sizes, conv_activation, conv_bias,
+                            conv_l1, conv_l2, conv_dropout, conv_batchnorm,
+                            conv_kwargs, graphpool, repeat_classes=[dict, str])
+    fp_layers = zip_mixed(fp_layer_sizes, fp_activation, fp_bias, fp_l1, fp_l2,
+                          fp_dropout, fp_batchnorm, fp_kwargs,
+                          repeat_classes=[dict, str])
+    net_layers = zip_mixed(net_layer_sizes, net_activation, net_bias, net_l1,
+                           net_l2, net_dropout, net_batchnorm, net_kwargs,
+                           repeat_classes=[dict, str])
 
     # Ensure fp_layers is of length conv_layers+1
     if len(fp_layer_sizes) != len(conv_layer_sizes) + 1:
-        assert len(
-            fp_layer_sizes
-        ) == 1, 'Incorrect amount of fingerprint layers specified. Either specify 1 or len(conv_layer_sizes)+1 ({}) fp_layer_sizes ({})'.format(
-            len(conv_layer_sizes) + 1, len(fp_layer_sizes))
+        assert len(fp_layer_sizes) == 1, (
+            'Incorrect amount of fingerprint layers specified. Either specify '
+            '1 or len(conv_layer_sizes)+1 ({}) fp_layer_sizes ({})'.format(
+                len(conv_layer_sizes) + 1, len(fp_layer_sizes)))
         # Add None for fp_layer_sizes and add None-tuples to fp_layers to align
-        # 	fp layers with conv_layers (the one layer provided will be the last layer)
+        # fp layers with conv_layers (the one layer provided will be the last
+        # layer)
         fp_layer_sizes = [None] * len(conv_layer_sizes) + list(fp_layer_sizes)
         fp_layers = [(
             None, ) * len(fp_layers[0])] * len(conv_layer_sizes) + fp_layers
 
     # Check zip result is the same length as specified sizes
-    assert len(conv_layers) == len(
-        conv_layer_sizes
-    ), 'If `conv_`-layer-arguments are specified as a list, they should have the same length as `conv_layer_sizes` (length {0}), found an argument of lenght {1}'.format(
-        len(conv_layer_sizes), len(conv_layers))
-    assert len(fp_layers) == len(
-        fp_layer_sizes
-    ), 'If `fp`-layer-arguments are specified as a list, they should have the same length as `fp_layer_sizes` (len {0}), found an argument of lenght {1}'.format(
-        len(fp_layer_sizes), len(fp_layers))
-    assert len(net_layers) == len(
-        net_layer_sizes
-    ), 'If `net_`-layer-arguments are specified as a list, they should have the same length as `net_layer_sizes` (length {0}), found an argument of lenght {1}'.format(
-        len(net_layer_sizes), len(net_layers))
+    assert len(conv_layers) == len(conv_layer_sizes), (
+        'If `conv_`-layer-arguments are specified as a list, they should have '
+        'the same length as `conv_layer_sizes` (length {0}), found an argument '
+        'of length {1}'.format(len(conv_layer_sizes), len(conv_layers)))
+    assert len(fp_layers) == len(fp_layer_sizes), (
+        'If `fp`-layer-arguments are specified as a list, they should have the '
+        'same length as `fp_layer_sizes` (len {0}), found an argument of length '
+        '{1}'.format(len(fp_layer_sizes), len(fp_layers)))
+    assert len(net_layers) == len(net_layer_sizes), (
+        'If `net_`-layer-arguments are specified as a list, they should have '
+        'the same length as `net_layer_sizes` (length {0}), found an argument '
+        'of length {1}'.format(len(net_layer_sizes), len(net_layers)))
 
     # ======= Build the network =======
 
@@ -236,8 +193,8 @@ def build_graph_conv_net(data_input,
         return Dropout(p_dropout)
 
     # Add first output layer directly to atom inputs
-    fp_size, fp_activation, fp_bias, fp_l1, fp_l2, fp_dropout, fp_batchnorm, fp_kwargs = fp_layers.pop(
-        0)
+    (fp_size, fp_activation, fp_bias, fp_l1, fp_l2, fp_dropout, fp_batchnorm,
+     fp_kwargs) = fp_layers.pop(0)
     if fp_size:
         fp_atoms_in = atoms
 
@@ -249,9 +206,9 @@ def build_graph_conv_net(data_input,
         fp_out = NeuralGraphOutput(
             fp_size,
             activation=fp_activation,
-            bias=fp_bias,
-            W_regularizer=l1l2(fp_l1, fp_l2),
-            b_regularizer=l1l2(fp_l1, fp_l2),
+            use_bias=fp_bias,
+            kernel_regularizer=l1_l2(fp_l1, fp_l2),
+            bias_regularizer=l1_l2(fp_l1, fp_l2),
             **fp_kwargs)([fp_atoms_in, bonds, edges])
         fingerprint_outputs.append(fp_out)
 
@@ -262,7 +219,8 @@ def build_graph_conv_net(data_input,
         # Import parameters
         (conv_size, conv_activation, conv_bias, conv_l1, conv_l2, conv_dropout,
          conv_batchnorm, conv_kwargs, graphpool) = conv_layer
-        fp_size, fp_activation, fp_bias, fp_l1, fp_l2, fp_dropout, fp_batchnorm, fp_kwargs = fp_layer
+        (fp_size, fp_activation, fp_bias, fp_l1, fp_l2, fp_dropout,
+         fp_batchnorm, fp_kwargs) = fp_layer
 
         # Add hidden layer
         atoms_in = convolved_atoms[-1]
@@ -273,14 +231,14 @@ def build_graph_conv_net(data_input,
             atoms_in = ConvDropout(conv_dropout)(atoms_in)
 
         # Use inner_layer_fn init method of `NeuralGraphHidden`, because it is
-        # 	the most powerfull (e.g. allows custom activation functions)
+        # 	the most powerful (e.g. allows custom activation functions)
         def inner_layer_fn():
             return Dense(
                 conv_size,
                 activation=conv_activation,
-                bias=conv_bias,
-                W_regularizer=l1l2(conv_l1, conv_l2),
-                b_regularizer=l1l2(conv_l1, conv_l2),
+                use_bias=conv_bias,
+                kernel_regularizer=l1_l2(conv_l1, conv_l2),
+                bias_regularizer=l1_l2(conv_l1, conv_l2),
                 **conv_kwargs)
 
         atoms_out = NeuralGraphHidden(inner_layer_fn)([atoms_in, bonds, edges])
@@ -303,9 +261,9 @@ def build_graph_conv_net(data_input,
             fp_out = NeuralGraphOutput(
                 fp_size,
                 activation=fp_activation,
-                bias=fp_bias,
-                W_regularizer=l1l2(fp_l1, fp_l2),
-                b_regularizer=l1l2(fp_l1, fp_l2),
+                use_bias=fp_bias,
+                kernel_regularizer=l1_l2(fp_l1, fp_l2),
+                bias_regularizer=l1_l2(fp_l1, fp_l2),
                 **fp_kwargs)([fp_atoms_in, bonds, edges])
 
             # Export
@@ -313,7 +271,7 @@ def build_graph_conv_net(data_input,
 
     # Merge fingerprint
     if len(fingerprint_outputs) > 1:
-        final_fp = merge(fingerprint_outputs, mode=fp_merge_mode)
+        final_fp = Add()(fingerprint_outputs)
     else:
         final_fp = fingerprint_outputs[-1]
 
@@ -322,7 +280,8 @@ def build_graph_conv_net(data_input,
     for net_layer in net_layers:
 
         # Import parameters
-        layer_size, net_activation, net_bias, net_l1, net_l2, net_dropout, net_batchnorm, net_kwargs = net_layer
+        (layer_size, net_activation, net_bias, net_l1, net_l2, net_dropout,
+         net_batchnorm, net_kwargs) = net_layer
 
         # Add regular nn layers
         net_in = net_outputs[-1]
@@ -335,9 +294,9 @@ def build_graph_conv_net(data_input,
         net_out = Dense(
             layer_size,
             activation=net_activation,
-            bias=net_bias,
-            W_regularizer=l1l2(net_l1, net_l2),
-            b_regularizer=l1l2(net_l1, net_l2),
+            use_bias=net_bias,
+            kernel_regularizer=l1_l2(net_l1, net_l2),
+            bias_regularizer=l1_l2(net_l1, net_l2),
             **net_kwargs)(net_in)
 
         # Export

@@ -81,32 +81,36 @@ class NeuralGraphHidden(layers.Layer):
             self.conv_width = inner_layer_arg
             dense_layer_kwargs, kwargs = filter_func_args(
                 layers.Dense.__init__, kwargs, overrule_args=['name'])
-            self.create_inner_layer_fn = lambda: layers.Dense(self.conv_width, **dense_layer_kwargs)
+            self.create_inner_layer_fn = lambda: layers.Dense(
+                self.conv_width, **dense_layer_kwargs)
 
         # Case 2: Check if an initialised keras layer is given
         elif isinstance(inner_layer_arg, layers.Layer):
-            assert inner_layer_arg.built == False, 'When initialising with a keras layer, it cannot be built.'
-            _, self.conv_width = inner_layer_arg.compute_output_shape((None,
-                                                                       None))
+            assert inner_layer_arg.built == False, (
+                'When initialising with a keras layer, it cannot be built.')
+            self.conv_width = inner_layer_arg.units
             # layer_from_config will mutate the config dict, therefore create a get fn
-            self.create_inner_layer_fn = lambda: layers.deserialize(dict(
-                                                    class_name=inner_layer_arg.__class__.__name__,
-                                                    config=inner_layer_arg.get_config()))
+            self.create_inner_layer_fn = lambda: layers.deserialize(
+                dict(class_name=inner_layer_arg.__class__.__name__,
+                     config=inner_layer_arg.get_config()))
 
-        # Case 3: Check if a function is provided that returns a initialised keras layer
+        # Case 3: Check if a function is provided that returns a initialised
+        # keras layer
         elif callable(inner_layer_arg):
             example_instance = inner_layer_arg()
-            assert isinstance(
-                example_instance, layers.Layer
-            ), 'When initialising with a function, the function has to return a keras layer'
-            assert example_instance.built == False, 'When initialising with a keras layer, it cannot be built.'
-            _, self.conv_width = example_instance.compute_output_shape((None,
-                                                                        None))
+            assert isinstance(example_instance, layers.Layer), (
+                'When initialising with a function, the function has to '
+                'return a keras layer')
+            assert example_instance.built == False, (
+                'When initialising with a keras layer, it cannot be built.')
+            self.conv_width = example_instance.units
             self.create_inner_layer_fn = inner_layer_arg
 
         else:
             raise ValueError(
-                'NeuralGraphHidden has to be initialised with 1). int conv_widht, 2). a keras layer instance, or 3). a function returning a keras layer instance.'
+                'NeuralGraphHidden has to be initialised with 1). int conv_width, '
+                '2). a keras layer instance, or 3). a function returning a keras layer '
+                'instance.'
             )
 
         super(NeuralGraphHidden, self).__init__(**kwargs)
@@ -173,7 +177,7 @@ class NeuralGraphHidden(layers.Layer):
             [summed_atom_features, summed_bond_features], axis=-1)
 
         # For each degree we convolve with a different weight matrix
-        new_features_by_degree = []
+        new_features = None
         for degree in range(self.max_degree):
 
             # Create mask for this degree
@@ -191,10 +195,10 @@ class NeuralGraphHidden(layers.Layer):
             # Do explicit masking because TimeDistributed does not support masking
             new_masked_features = new_unmasked_features * atom_masks_this_degree
 
-            new_features_by_degree.append(new_masked_features)
-
-        # Finally sum the features of all atoms
-        new_features = K.sum(new_features_by_degree, axis=-2)
+            if new_features is None:
+                new_features = new_masked_features 
+            else:
+                new_features += new_masked_features
 
         return new_features
 
@@ -291,7 +295,8 @@ class NeuralGraphOutput(layers.Layer):
         `(samples, fp_length)`
 
     # References
-        - [Convolutional Networks on Graphs for Learning Molecular Fingerprints](https://arxiv.org/abs/1509.09292)
+        - [Convolutional Networks on Graphs for Learning Molecular
+           Fingerprints](https://arxiv.org/abs/1509.09292)
 
     '''
 
@@ -303,24 +308,25 @@ class NeuralGraphOutput(layers.Layer):
             self.fp_length = inner_layer_arg
             dense_layer_kwargs, kwargs = filter_func_args(
                 layers.Dense.__init__, kwargs, overrule_args=['name'])
-            self.create_inner_layer_fn = lambda: layers.Dense(self.fp_length, **dense_layer_kwargs)
+            self.create_inner_layer_fn = lambda: layers.Dense(
+                self.fp_length, **dense_layer_kwargs)
 
         # Case 2: Check if an initialised keras layer is given
         elif isinstance(inner_layer_arg, layers.Layer):
-            assert inner_layer_arg.built == False, 'When initialising with a keras layer, it cannot be built.'
-            _, self.fp_length = inner_layer_arg.compute_output_shape(
-                (None, None))
+            assert inner_layer_arg.built == False, (
+                'When initialising with a keras layer, it cannot be built.')
+            self.fp_length = inner_layer_arg.units
             self.create_inner_layer_fn = lambda: inner_layer_arg
 
         # Case 3: Check if a function is provided that returns a initialised keras layer
         elif callable(inner_layer_arg):
             example_instance = inner_layer_arg()
-            assert isinstance(
-                example_instance, layers.Layer
-            ), 'When initialising with a function, the function has to return a keras layer'
-            assert example_instance.built == False, 'When initialising with a keras layer, it cannot be built.'
-            _, self.fp_length = example_instance.compute_output_shape(
-                (None, None))
+            assert isinstance(example_instance, layers.Layer), (
+                'When initialising with a function, the function has to return'
+                ' a keras layer')
+            assert example_instance.built == False, (
+                'When initialising with a keras layer, it cannot be built.')
+            self.fp_length = example_instance.units
             self.create_inner_layer_fn = inner_layer_arg
 
         else:
