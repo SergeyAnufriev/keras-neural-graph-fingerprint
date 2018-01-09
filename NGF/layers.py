@@ -7,8 +7,69 @@ from copy import deepcopy
 from keras import layers
 import keras.backend as K
 
-from NGF.backend import neighbour_lookup
 from .utils import filter_func_args, mol_shapes_to_dims
+
+
+def neighbour_lookup(atoms, edges, maskvalue=0, include_self=False):
+    ''' Looks up the features of an all atoms neighbours, for a batch of molecules.
+
+    # Arguments:
+        atoms (K.tensor): of shape (batch_n, max_atoms, num_atom_features)
+        edges (K.tensor): of shape (batch_n, max_atoms, max_degree) with neighbour
+            indices and -1 as padding value
+        maskvalue (numerical): the maskingvalue that should be used for empty atoms
+            or atoms that have no neighbours (does not affect the input maskvalue
+            which should always be -1!)
+        include_self (bool): if True, the featurevector of each atom will be added
+            to the list feature vectors of its neighbours
+
+    # Returns:
+        neigbour_features (K.tensor): of shape (batch_n, max_atoms(+1), max_degree,
+            num_atom_features) depending on the value of include_self
+
+    # Todo:
+        - make this function compatible with Tensorflow, it should be quite trivial
+            because there is an equivalent of `T.arange` in tensorflow.
+    '''
+
+    # The lookup masking trick: We add 1 to all indices, converting the
+    #   masking value of -1 to a valid 0 index.
+    masked_edges = edges + 1
+    # We then add a padding vector at index 0 by padding to the left of the
+    #   lookup matrix with the value that the new mask should get
+    masked_atoms = K.temporal_padding(atoms, (1, 0))
+
+    # Import dimensions
+    atoms_shape = K.shape(masked_atoms)
+    batch_n = atoms_shape[0]
+    lookup_size = atoms_shape[1]
+    num_atom_features = atoms_shape[2]
+
+    edges_shape = K.shape(masked_edges)
+    max_atoms = edges_shape[1]
+    max_degree = edges_shape[2]
+
+    # create broadcastable offset
+    offset_shape = (batch_n, 1, 1)
+    offset = K.reshape(
+        K.arange(batch_n, dtype=K.dtype(masked_edges)), offset_shape)
+    offset *= lookup_size
+
+    # apply offset to account for the fact that after reshape, all individual
+    #   batch_n indices will be combined into a single big index
+    flattened_atoms = K.reshape(masked_atoms, (-1, num_atom_features))
+    flattened_edges = K.reshape(masked_edges + offset, (batch_n, -1))
+
+    # Gather flattened
+    flattened_result = K.gather(flattened_atoms, flattened_edges)
+
+    # Unflatten result
+    output_shape = (batch_n, max_atoms, max_degree, num_atom_features)
+    output = K.reshape(flattened_result, output_shape)
+
+    if include_self:
+        return K.concatenate([K.expand_dims(atoms, 2), output], axis=2)
+    return output
 
 
 class NeuralGraphHidden(layers.Layer):
@@ -160,7 +221,7 @@ class NeuralGraphHidden(layers.Layer):
         num_bond_features = bonds._keras_shape[-1]
 
         # Create a matrix that stores for each atom, the degree it is
-        atom_degrees = K.sum(K.not_equal(edges, -1), axis=-1, keepdims=True)
+        atom_degrees = K.sum(K.cast(K.not_equal(edges, -1), 'int32'), axis=-1, keepdims=True)
 
         # For each atom, look up the features of it's neighbour
         neighbour_atom_features = neighbour_lookup(
@@ -376,7 +437,7 @@ class NeuralGraphOutput(layers.Layer):
         #   to create a general atom mask (unused atoms are 0 padded)
         # We have to use the edge vector for this, because in theory, a convolution
         #   could lead to a zero vector for an atom that is present in the molecule
-        atom_degrees = K.sum(K.not_equal(edges, -1), axis=-1, keepdims=True)
+        atom_degrees = K.sum(K.cast(K.not_equal(edges, -1), 'int32'), axis=-1, keepdims=True)
         general_atom_mask = K.cast(K.not_equal(atom_degrees, 0), K.floatx())
 
         # Sum the edge features for each atom
